@@ -1,0 +1,2235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turing Machine Simulator</title>
+  <meta name="description" content="An interactive Turing Machine simulator with visual tape, head movement, and state transitions.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet"/>
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <style>
+/* ===== Design Tokens ===== */
+:root {
+  /* Light Theme */
+  --light-bg: #F8FAFC;
+  --light-surface: #FFFFFF;
+  --light-border: #E2E8F0;
+  --light-text: #0F172A;
+  --light-text-sec: #475569;
+  --light-text-mut: #94A3B8;
+  --light-primary: #1E3A8A; /* Dark Blue */
+  --light-primary-hover: #1E40AF;
+  --light-accent: #2563EB; /* Blue Accent */
+  --light-success: #10B981;
+  --light-danger: #EF4444;
+
+  /* Dark Theme */
+  --dark-bg: #0B1120;
+  --dark-surface: #1E293B;
+  --dark-border: #334155;
+  --dark-text: #F8FAFC;
+  --dark-text-sec: #CBD5E1;
+  --dark-text-mut: #64748B;
+  --dark-primary: #3B82F6; /* Bright Blue for Dark Mode */
+  --dark-primary-hover: #60A5FA;
+  --dark-accent: #1D4ED8; /* Darker Blue Accent */
+  --dark-success: #34D399;
+  --dark-danger: #F87171;
+
+  --font-sans: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 10px 25px rgba(0,0,0,0.1);
+
+  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Base Light/Dark Mappings */
+body.light-theme {
+  --bg: var(--light-bg);
+  --surface: var(--light-surface);
+  --border: var(--light-border);
+  --text: var(--light-text);
+  --text-sec: var(--light-text-sec);
+  --text-mut: var(--light-text-mut);
+  --primary: var(--light-primary);
+  --primary-hover: var(--light-primary-hover);
+  --accent: var(--light-accent);
+  --success: var(--light-success);
+  --danger: var(--light-danger);
+  --shadow: var(--shadow-md);
+  
+  /* overrides for dark header */
+  --nav-bg: #FFFFFF;
+  --nav-text: #1E293B;
+  --nav-border: #E2E8F0;
+}
+
+body.dark-theme {
+  --bg: var(--dark-bg);
+  --surface: var(--dark-surface);
+  --border: var(--dark-border);
+  --text: var(--dark-text);
+  --text-sec: var(--dark-text-sec);
+  --text-mut: var(--dark-text-mut);
+  --primary: var(--dark-primary);
+  --primary-hover: var(--dark-primary-hover);
+  --accent: var(--dark-accent);
+  --success: var(--dark-success);
+  --danger: var(--dark-danger);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+
+  --nav-bg: #151823;
+  --nav-text: #F8FAFC;
+  --nav-border: #2A2E42;
+}
+
+/* Base Resets */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  transition: background-color var(--transition), color var(--transition);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Navbar */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: var(--nav-bg);
+  border-bottom: 1px solid var(--nav-border);
+  color: var(--nav-text);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  z-index: 10;
+}
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo-icon {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  font-size: 1.25rem;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+.navbar-brand h1 {
+  font-size: 1.35rem; 
+  font-weight: 700; 
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 8px rgba(59, 130, 246, 0.3));
+}
+
+/* Main Container */
+.main-container {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - 69px);
+  overflow: hidden;
+}
+
+/* Left Panel */
+.left-panel {
+  width: 380px;
+  background-color: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 2rem;
+}
+.left-panel::-webkit-scrollbar { width: 6px; }
+.left-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.left-panel.hidden { display: none; }
+.left-panel::-webkit-scrollbar { width: 6px; }
+.left-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.panel-content h2 { margin-bottom: 1rem; font-size: 1.4rem; color: var(--primary); font-weight: 700; }
+.panel-content h3 { margin: 1.5rem 0 0.75rem; font-size: 1.15rem; font-weight: 600; }
+.panel-content h4 { margin-top: 0; font-size: 1.05rem; }
+.panel-content p { color: var(--text-sec); font-size: 0.95rem; margin-bottom: 1rem; }
+
+.info-card, .example-box {
+  background-color: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  margin: 1.5rem 0;
+}
+.example-box {
+  background: linear-gradient(to right bottom, rgba(59, 130, 246, 0.05), transparent);
+  border-left: 3px solid var(--primary);
+}
+.component-list, .steps-list {
+  padding-left: 1.5rem;
+  font-size: 0.95rem;
+  color: var(--text-sec);
+}
+.component-list li, .steps-list li { margin-bottom: 0.5rem; }
+.component-list strong, .steps-list strong { color: var(--text); }
+code { background: var(--surface); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); font-family: var(--font-mono); font-size: 0.85em; color: var(--accent); }
+
+/* Right Panel */
+.right-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+  background-color: var(--bg);
+}
+.simulator-wrapper {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Simulate Header */
+.sim-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.preset-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background-color: rgba(59, 130, 246, 0.15); /* Light blue tint */
+  border-color: rgba(59, 130, 246, 0.3);
+}
+.preset-wrapper i { color: var(--primary); }
+.preset-wrapper select {
+  background: transparent; border: none; font-family: var(--font-sans); color: var(--text);
+  font-size: 0.95rem; outline: none; cursor: pointer; padding: 4px;
+}
+.preset-wrapper select option {
+  background-color: var(--surface);
+  color: var(--text);
+}
+
+.sim-actions { display: flex; gap: 10px; }
+.btn-icon-text { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; font-weight: 600; font-size: 0.9rem; }
+.btn { border: none; border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition); font-family: var(--font-sans); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-icon-text.btn { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.btn-icon-text.btn:hover:not(:disabled) { background: var(--border); }
+.btn-icon-text.btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-hover)); color: white; border: none; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
+.btn-icon-text.btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4); }
+.btn-icon-text.btn-success { background: linear-gradient(135deg, var(--success), #059669); color: white; border: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+.btn-icon-text.btn-success:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4); }
+.btn-icon-text.btn-danger { background: linear-gradient(135deg, var(--danger), #b91c1c); color: white; border: none; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); }
+.btn-icon-text.btn-danger:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4); }
+
+.preset-description {
+  background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2);
+  padding: 12px 16px; border-radius: var(--radius-md); font-size: 0.9rem; color: var(--primary);
+  display: none;
+}
+.preset-description.visible { display: block; animation: fadeIn 0.3s ease; }
+
+/* Cards Layout */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.card-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.card-header h4 { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 1.1rem; }
+.zoom-controls { display: flex; align-items: center; gap: 8px; }
+.btn-zoom {
+  background: var(--bg); color: var(--text-sec); border: 1px solid var(--border);
+  width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.2s; font-size: 0.9rem;
+}
+.btn-zoom:hover { background: var(--surface); border-color: var(--primary); color: var(--primary); }
+#zoom-value { font-size: 0.8rem; font-family: var(--font-mono); color: var(--text-mut); min-width: 40px; text-align: center; }
+.ml-2 { margin-left: 8px; }
+.card-body { padding: 1.5rem; }
+
+/* Tape Visualization */
+.tape-screen {
+  padding: 3.5rem 1rem 3.2rem;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+}
+.tape-scroll-container { overflow-x: auto; padding-bottom: 24px; scrollbar-width: thin; scrollbar-color: var(--border) transparent;}
+.tape-scroll-container::-webkit-scrollbar { height: 6px; }
+.tape-scroll-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.tape { display: flex; min-width: min-content; justify-content: center; position: relative; gap: 2px;}
+
+.tape-cell {
+  width: 58px; height: 64px;
+  background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; color: var(--text);
+  flex-shrink: 0; position: relative; transition: all 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+.tape-cell.active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(139, 92, 246, 0.2));
+  border-color: var(--accent); color: var(--accent);
+  transform: translateY(-4px); box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3); z-index: 2;
+}
+.tape-cell.active.halted {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.12), rgba(220, 38, 38, 0.22));
+  border-color: #dc2626; color: #dc2626;
+  box-shadow: 0 8px 24px rgba(220, 38, 38, 0.4);
+}
+.tape-cell.just-written { animation: highlightWrite 0.4s ease; }
+
+.cell-index {
+  position: absolute; bottom: -24px; font-size: 0.7rem; color: var(--text-mut); font-family: var(--font-sans);
+}
+
+.cell-state-label { display: none; }
+
+/* ACCEPT / REJECT result label — appears below the tape cell symbol */
+.cell-result-label {
+  position: absolute;
+  bottom: -46px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 10px;
+  pointer-events: none;
+  animation: resultPop 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.cell-result-label.accept {
+  color: #00cc66;
+  border: 1.5px solid #00cc66;
+  background: rgba(0,204,102,0.10);
+  text-shadow: 0 0 8px rgba(0,204,102,0.5);
+}
+.cell-result-label.reject {
+  color: #ff3333;
+  border: 1.5px solid #ff3333;
+  background: rgba(255,51,51,0.10);
+  text-shadow: 0 0 8px rgba(255,51,51,0.5);
+}
+@keyframes resultPop {
+  0%   { opacity: 0; transform: translateX(-50%) scale(0.5); }
+  70%  { transform: translateX(-50%) scale(1.15); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
+.head-state-label {
+  margin-top: 5px;
+  font-family: var(--font-mono);
+  font-weight: 800;
+  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+  color: #fff;
+  background: linear-gradient(135deg, #7C3AED, #5B21B6);
+  padding: 3px 12px;
+  border-radius: 20px;
+  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.6);
+  white-space: nowrap;
+  animation: stateLabelPop 0.2s ease;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+.head-state-label.halt {
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+  box-shadow: 0 2px 14px rgba(220, 38, 38, 0.7);
+}
+@keyframes stateLabelPop {
+  0%   { transform: scale(0.7); opacity: 0.4; }
+  70%  { transform: scale(1.12); }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+.head-container { position: relative; height: 80px; margin-top: 10px; display: flex; justify-content: center; }
+.head { position: absolute; display: flex; flex-direction: column; align-items: center; transition: left 0.3s ease-in-out; }
+.head-arrow {
+  width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent;
+  border-bottom: 14px solid var(--accent); filter: drop-shadow(0 -3px 6px rgba(139, 92, 246, 0.5));
+  animation: floatHead 1.5s infinite ease-in-out;
+}
+.head-state {
+  margin-top: 6px; background: linear-gradient(135deg, var(--accent), #7C3AED); color: white;
+  padding: 6px 20px; border-radius: 20px; font-family: var(--font-mono); font-weight: 700; font-size: 1.05rem;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+  letter-spacing: 0.5px;
+}
+
+.badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; }
+.badge.ready { background: var(--bg); color: var(--text-sec); border: 1px solid var(--border); }
+.badge.running { background: rgba(59, 130, 246, 0.15); color: var(--primary); border: 1px solid rgba(59, 130, 246, 0.3);}
+.badge.accepted { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3);}
+.badge.rejected, .badge.error { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3);}
+.badge.halted { background: rgba(139, 92, 246, 0.15); color: var(--accent); border: 1px solid rgba(139, 92, 246, 0.3);}
+
+/* Tape Footer Stats */
+.tape-footer {
+  display: flex; background: var(--surface); border-top: 1px solid var(--border);
+}
+.stat-group { flex: 1; padding: 1rem; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.stat-divider { width: 1px; background: var(--border); }
+.stat-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-sec); font-weight: 600; letter-spacing: 0.5px; }
+.stat-value { font-size: 1.15rem; font-weight: 700; font-family: var(--font-mono); }
+.stat-value.highlight { color: var(--primary); }
+
+/* Settings Grid */
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+
+/* Config Form */
+.speed-control { display: flex; align-items: center; gap: 8px;}
+.speed-control input { width: 100px; accent-color: var(--primary); cursor: pointer;}
+
+.input-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+.input-group { display: flex; flex-direction: column; gap: 6px; }
+.full-width { grid-column: 1 / -1; }
+.input-group label, .rules-header label { font-size: 0.8rem; font-weight: 600; color: var(--text-sec); text-transform: uppercase; }
+.input-group input {
+  padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text); font-family: var(--font-mono); font-size: 0.9rem; transition: var(--transition);
+}
+.input-group input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+
+/* Transition Rules Table */
+.rules-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.btn-small { padding: 6px 12px; font-size: 0.8rem; font-weight: 600; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm);cursor: pointer; transition: var(--transition);}
+.btn-small:hover { background: var(--border); }
+
+.table-container { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; margin-bottom: 8px; }
+.rules-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 0.85rem; }
+.rules-table th { background: var(--bg); padding: 8px; text-align: center; color: var(--text-mut); font-weight: 600; border-bottom: 1px solid var(--border); text-transform: uppercase; font-size: 0.75rem;}
+.rules-table td { padding: 6px; text-align: center; border-bottom: 1px solid var(--border); }
+.rules-table tr:last-child td { border-bottom: none; }
+.rules-table tr:hover { background: var(--bg); }
+.rules-table tr.active-rule { background: rgba(59, 130, 246, 0.1); }
+.rules-table input, .rules-table select {
+  width: 100%; min-width: 40px; padding: 6px; border: 1px solid transparent; background: transparent;
+  color: var(--text); font-family: var(--font-mono); font-size: 0.85rem; text-align: center; border-radius: 4px; transition: var(--transition);
+}
+.rules-table input:focus, .rules-table select:focus {
+  background: var(--surface); border-color: var(--primary); outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+.rules-table select option { background: var(--surface); color: var(--text); }
+.btn-danger-small { background: transparent; color: var(--text-mut); border: none; font-size: 1.1rem; cursor: pointer; padding: 4px; border-radius: 4px; }
+.btn-danger-small:hover { color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+
+.validation-msg { font-size: 0.8rem; min-height: 20px; }
+.validation-msg.error { color: var(--danger); }
+.validation-msg.warning { color: coral; }
+
+/* Log Panel */
+.transition-banner {
+  background: var(--bg); border-bottom: 1px solid var(--border); padding: 12px 1.5rem;
+  display: flex; gap: 10px; align-items: center;
+}
+.transition-label { font-size: 0.8rem; font-weight: 600; color: var(--text-mut); text-transform: uppercase; }
+.transition-formula { font-family: var(--font-mono); font-weight: 600; color: var(--primary); font-size: 1.05rem; }
+
+.log-container { height: calc(100% - 130px); max-height: 380px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent;}
+.log-container::-webkit-scrollbar { width: 6px; }
+.log-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.log-empty { padding: 3rem 2rem; text-align: center; color: var(--text-mut); font-size: 0.9rem; }
+
+.log-entry { display: flex; align-items: center; gap: 1rem; padding: 10px 1.5rem; border-bottom: 1px solid var(--border); animation: slideIn 0.3s ease; }
+.log-entry:hover { background: var(--bg); }
+.log-step { font-family: var(--font-mono); font-weight: 700; color: var(--primary); font-size: 0.8rem; width: 40px; }
+.log-detail { font-family: var(--font-mono); font-size: 0.85rem; color: var(--text); }
+.log-detail .state, .log-detail .symbol { font-weight: 600; }
+.log-detail .arrow { margin: 0 6px; color: var(--text-mut); }
+.log-detail .direction { background: var(--bg); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; margin-left: 6px;}
+
+.log-halt { padding: 1rem 1.5rem; font-weight: 600; font-size: 0.9rem; animation: slideIn 0.3s ease; }
+.log-halt.accepted { background: rgba(16, 185, 129, 0.1); color: var(--success); border-left: 3px solid var(--success);}
+.log-halt.rejected, .log-halt.error { background: rgba(239, 68, 68, 0.1); color: var(--danger); border-left: 3px solid var(--danger);}
+.log-halt.halted { background: rgba(139, 92, 246, 0.1); color: var(--accent); border-left: 3px solid var(--accent);}
+
+/* Utilities */
+.btn-block { width: 100%; padding: 12px; font-size: 1rem; font-weight: 600; display: flex; justify-content: center; align-items: center; gap: 8px;}
+.mt-3 { margin-top: 1.5rem; }
+
+/* Keyframes */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes floatHead { 0% { transform: translateY(0); } 50% { transform: translateY(-4px); } 100% { transform: translateY(0); } }
+@keyframes highlightWrite { 0% { transform: scale(1); } 50% { transform: scale(1.1); box-shadow: 0 0 20px var(--accent); } 100% { transform: scale(1); transform: translateY(-4px); } }
+
+/* Mobile Repsoniveness */
+@media (max-width: 1024px) {
+  .main-container { flex-direction: column; overflow-y: auto; height: auto;}
+  .left-panel { width: 100%; border-right: none; border-bottom: 1px solid var(--border); height: auto; }
+  .settings-grid { grid-template-columns: 1fr; }
+  .right-panel { overflow-y: visible; }
+}
+
+/* --- React Flow Custom Node Styles --- */
+.tm-node {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: var(--surface);
+  border: 2px solid var(--text-mut);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text);
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.tm-node.accept::before {
+  content: '';
+  position: absolute;
+  top: 4px; left: 4px; right: 4px; bottom: 4px;
+  border: 1px solid var(--text-mut);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.tm-node.active {
+  background: var(--surface);
+  border-color: var(--primary-hover);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+  color: var(--primary-hover);
+}
+.tm-node.active.accept::before {
+  border-color: var(--primary-hover);
+}
+
+.tm-node .react-flow__handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.react-flow__controls button {
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  fill: var(--text);
+}
+.react-flow__controls button:hover {
+  background-color: var(--bg);
+}
+
+/* Learning View Styles */
+.learning-container { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 2rem; padding-bottom: 4rem; }
+.theory-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+.theory-card { background: var(--surface); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+.theory-card h3 { color: var(--primary); margin-bottom: 1rem; font-size: 1.25rem; font-family: 'Fredoka', sans-serif;}
+.theory-card p { font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--text-sec); }
+.tuple-list { padding-left: 1.25rem; font-size: 0.9rem; color: var(--text-sec); }
+.tuple-list li { margin-bottom: 0.5rem; }
+
+.learning-diagram-box { background: var(--dark-bg); color: #fff; padding: 2rem; border-radius: var(--radius-lg); text-align: center; border: 1px solid rgba(255,255,255,0.1); }
+.sample-dia { display: flex; align-items: center; justify-content: center; gap: 2rem; margin-bottom: 1.5rem; }
+.dia-node { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid rgba(255,255,255,0.2); }
+.dia-node.blue { background: #5DADE2; box-shadow: 0 0 15px rgba(93, 173, 226, 0.6); }
+.dia-node.orange { background: #EB984E; box-shadow: 0 0 15px rgba(235, 152, 78, 0.6); }
+.dia-arrow { position: relative; padding: 0 20px; font-family: var(--font-mono); font-size: 0.8rem; }
+.dia-arrow::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: rgba(255,255,255,0.3); }
+
+/* Challenges View Styles */
+.challenge-header { text-align: center; margin-bottom: 3rem; }
+.challenge-header h2 { font-size: 2.2rem; color: var(--primary); margin-bottom: 0.5rem; font-family: 'Fredoka', sans-serif; }
+.challenge-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; max-width: 900px; margin: 0 auto; }
+.challenge-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 2.5rem; text-align: center; transition: var(--transition); }
+.challenge-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); border-color: var(--primary); }
+.badge-row { display: flex; flex-direction: column; gap: 8px; margin: 1.5rem 0; }
+.badge { padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; width: fit-content; margin: 0 auto;}
+.badge.gold { background: rgba(244, 208, 63, 0.15); color: #B7950B; border: 1px solid rgba(244, 208, 63, 0.3); }
+.badge.silver { background: rgba(189, 195, 199, 0.15); color: #7F8C8D; border: 1px solid rgba(189, 195, 199, 0.3); }
+.badge.bronze { background: rgba(211, 84, 0, 0.1); color: #A04000; border: 1px solid rgba(211, 84, 0, 0.2); }
+
+.active-indicator { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; padding: 14px 28px; border-radius: 50px; box-shadow: 0 8px 32px rgba(59, 130, 246, 0.4); font-weight: 600; z-index: 100; display: flex; align-items: center; gap: 12px; border: 1px solid rgba(255,255,255,0.1); }
+
+</style>
+</head>
+<body class="dark-theme">
+  <!-- Top Navbar -->
+  <header class="navbar">
+    <div class="navbar-brand">
+      <div class="logo-icon">
+        <i class="ri-cpu-line"></i>
+      </div>
+      <h1>Turing Machine Simulator</h1>
+    </div>
+
+    <div class="navbar-actions">
+      <button id="theme-toggle" class="btn-icon" title="Toggle Light/Dark Mode">
+        <i class="ri-sun-line theme-icon-light"></i>
+        <i class="ri-moon-line theme-icon-dark" style="display:none;"></i>
+      </button>
+    </div>
+  </header>
+
+  <main class="main-container">
+    <!-- LEFT PANEL: Educational -->
+    <section class="left-panel">
+      <div class="panel-content">
+        <h2>What is a Turing Machine?</h2>
+        <p>A Turing Machine is a mathematical model of computation that defines an abstract machine capable of implementing any computer algorithm. Invented by Alan Turing in 1936, it is widely considered the foundation of modern computer science.</p>
+        
+        <div class="info-card">
+          <h3><i class="ri-puzzle-line"></i> Key Components</h3>
+          <ul class="component-list">
+            <li><strong>The Tape:</strong> An infinite strip of memory divided into discrete cells. Each cell contains a symbol from a finite alphabet or is blank.</li>
+            <li><strong>The Head:</strong> A generic read/write pointer that can move left (L) or right (R) one cell at a time.</li>
+            <li><strong>State Register:</strong> Stores the current internal state of the Turing machine, starting in an initial configuration.</li>
+            <li><strong>Transition Function:</strong> The rules that tell the machine what to do next based on its current state and the symbol the head is reading.</li>
+          </ul>
+        </div>
+
+        <h3>How it Works</h3>
+        <p>In each step, the machine:</p>
+        <ol class="steps-list">
+          <li><strong>Reads</strong> the symbol on the tape under the head.</li>
+          <li>Looks up the <strong>Transition Rule</strong> for the current state and symbol.</li>
+          <li><strong>Writes</strong> a new symbol to the cell.</li>
+          <li><strong>Moves</strong> the head one cell to the left (L) or right (R).</li>
+          <li><strong>Changes</strong> to the new internal state.</li>
+        </ol>
+
+        <div class="example-box">
+          <h4>Example: Replacing 0s with 1s</h4>
+          <p>If the machine is in state <code>q0</code> and reads a <code>0</code>, it writes a <code>1</code>, moves <code>R</code> (right), and stays in state <code>q0</code>.</p>
+          <p>It continues this until it reads a blank symbol (<code>_</code>), where it moves <code>L</code> and changes to a halting state.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: Simulator Area -->
+    <section class="right-panel">
+      <div class="simulator-wrapper">
+
+        <!-- Top Controls & Presets -->
+        <div class="sim-header">
+          <div class="preset-wrapper">
+              <select id="preset-select">
+              <option value="straight_machine" selected>Straight Transitions (q0-q4)</option>
+              <option value="">— Custom Machine —</option>
+              <option value="replace_0s">Replace 0s with 1s</option>
+              <option value="binary_increment">Binary Increment</option>
+              <option value="palindrome">Palindrome Checker</option>
+              <option value="anbn">0ⁿ1ⁿ Recognizer</option>
+              <option value="busy_beaver">Busy Beaver (3-state)</option>
+            </select>
+          </div>
+          <div class="sim-actions">
+             <button class="btn btn-icon-text" id="btn-reset" title="Reset to initial state">
+               <i class="ri-loop-left-line"></i> Reset
+             </button>
+             <button class="btn btn-icon-text btn-primary" id="btn-step" title="Execute a single step">
+               <i class="ri-skip-forward-line"></i> Step
+             </button>
+             <button class="btn btn-icon-text btn-danger" id="btn-back" title="Go backward one step">
+               <i class="ri-skip-back-line"></i> Back
+             </button>
+             <button class="btn btn-icon-text btn-success" id="btn-run" title="Auto-run program">
+               <i class="ri-play-fill"></i> Run
+             </button>
+             <button class="btn btn-icon-text btn-danger" id="btn-pause" title="Pause auto-run" disabled>
+               <i class="ri-pause-fill"></i> Pause
+             </button>
+          </div>
+        </div>
+        
+        <!-- Preset Info -->
+        <div class="preset-description" id="preset-description"></div>
+
+        <!-- Transition Diagram Container -->
+        <div class="card diagram-card">
+          <div class="card-header diagram-header">
+            <h4><i class="ri-node-tree"></i> Transition Diagram</h4>
+            <div class="zoom-controls">
+              <button id="btn-zoom-out" class="btn-zoom" title="Zoom Out"><i class="ri-subtract-line"></i></button>
+              <span id="zoom-value">100%</span>
+              <button id="btn-zoom-in" class="btn-zoom" title="Zoom In"><i class="ri-add-line"></i></button>
+              <button id="btn-zoom-reset" class="btn-zoom ml-2" title="Reset Zoom"><i class="ri-refresh-line"></i></button>
+            </div>
+          </div>
+          <div id="diagram-container" style="height: 520px; background-color: var(--bg);"></div>
+          <!-- Legend matching turingmachine.io -->
+          <div style="display:flex; align-items:center; gap:18px; padding:8px 18px 10px; background:var(--bg); border-top:1px solid var(--border); flex-wrap:wrap;">
+            <span style="font-size:0.72rem; color:var(--text-mut); font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Legend:</span>
+            <span style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--text-sec);font-family:var(--font-mono)"><span style="width:14px;height:14px;border-radius:50%;background:#4B9CD3;display:inline-block;"></span> Start</span>
+            <span style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--text-sec);font-family:var(--font-mono)"><span style="width:14px;height:14px;border-radius:50%;background:#F0A500;display:inline-block;"></span> Intermediate</span>
+            <span style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--text-sec);font-family:var(--font-mono)"><span style="width:14px;height:14px;border-radius:50%;background:#3CB371;border:2px solid rgba(255,255,255,0.5);display:inline-block;"></span> Accept/Halt</span>
+            <span style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--text-sec);font-family:var(--font-mono)"><span style="width:14px;height:14px;border-radius:50%;background:#FFD700;display:inline-block;"></span> Active State</span>
+            <span style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--text-sec);font-family:var(--font-mono);margin-left:4px;">Labels: <code style="background:transparent;border:1px solid var(--border);padding:1px 5px;border-radius:3px;">[read/write, dir]</code></span>
+          </div>
+        </div>
+
+        <!-- Tape Visualization -->
+        <div class="card tape-card">
+          <div class="card-header tape-header">
+            <h4><i class="ri-film-line"></i> Tape Visualization</h4>
+            <div class="tape-status">
+               <span class="badge ready" id="status-indicator">
+                 <span id="status-val">Ready</span>
+               </span>
+            </div>
+          </div>
+          <div class="tape-screen">
+             <div class="tape-scroll-container" id="tape-scroll">
+                <div class="tape" id="tape"></div>
+             </div>
+             <div class="head-container" id="head-container">
+                <div class="head" id="head">
+                   <div class="head-arrow"></div>
+                </div>
+             </div>
+          </div>
+          
+          <div class="tape-footer">
+             <div class="stat-group">
+                <span class="stat-label">Step</span>
+                <span class="stat-value" id="step-count">0</span>
+             </div>
+             <div class="stat-divider"></div>
+             <div class="stat-group">
+                <span class="stat-label">Current State</span>
+                <span class="stat-value highlight" id="current-state-val">q0</span>
+             </div>
+             <div class="stat-divider"></div>
+             <div class="stat-group">
+                <span class="stat-label">Logical Position</span>
+                <span class="stat-value" id="head-pos-val">0</span>
+             </div>
+          </div>
+        </div>
+
+        <!-- Settings and Logs Grid -->
+        <div class="settings-grid">
+           <!-- Config Form -->
+           <div class="card config-card">
+              <div class="card-header config-header">
+                 <h4><i class="ri-settings-4-line"></i> Machine Configuration</h4>
+                 <div class="speed-control">
+                    <label for="speed-slider" id="speed-value" style="font-size:0.75rem; color:var(--text-muted); min-width:60px;">5 steps/s</label>
+                    <input type="range" id="speed-slider" min="1" max="20" value="5" title="Simulation Speed">
+                 </div>
+              </div>
+              <div class="card-body">
+                 <div class="input-grid">
+                    <div class="input-group full-width">
+                       <label>Input String</label>
+                       <input type="text" id="input-string" placeholder="e.g. 1011" spellcheck="false">
+                    </div>
+                    <div class="input-group">
+                       <label>Start State</label>
+                       <input type="text" id="start-state" value="q0" spellcheck="false">
+                    </div>
+                    <div class="input-group">
+                       <label>Halt State</label>
+                       <input type="text" id="halt-state" value="qh" spellcheck="false" placeholder="qh">
+                    </div>
+                    <div class="input-group">
+                       <label>Blank Symbol</label>
+                       <input type="text" id="blank-symbol" value="x" maxlength="1" spellcheck="false">
+                     </div>
+                     <div class="input-group full-width" id="explicit-config" style="display: flex; flex-direction: row; gap: 1rem; margin-top: 10px;">
+                        <div class="input-group" style="flex: 1;">
+                          <label>Allowed States (comma sep.)</label>
+                          <input type="text" id="explicit-states" placeholder="e.g. q0, q1, accept" title="Explicitly defines the nodes in the diagram" spellcheck="false">
+                        </div>
+                        <div class="input-group" style="flex: 1;">
+                          <label>Input/Tape Alphabet</label>
+                          <input type="text" id="explicit-alphabet" placeholder="e.g. 0, 1, X, Y" title="Allowed symbols for tape/rules" spellcheck="false">
+                        </div>
+                    </div>
+                 </div>
+
+                 <div class="rules-section">
+                    <div class="rules-header">
+                       <label>Transition Rules (δ)</label>
+                       <button class="btn btn-small" id="btn-add-rule"><i class="ri-add-line"></i> Add Rule</button>
+                    </div>
+                    <div class="table-container">
+                       <table class="rules-table" id="rules-table">
+                          <thead>
+                             <tr>
+                                <th>State</th>
+                                <th>Read</th>
+                                <th>Write</th>
+                                <th>Move</th>
+                                <th>Next</th>
+                                <th></th>
+                             </tr>
+                          </thead>
+                          <tbody id="rules-body"></tbody>
+                       </table>
+                    </div>
+                    <div class="validation-msg" id="validation-msg"></div>
+                 </div>
+
+                 <button class="btn btn-primary btn-block mt-3" id="btn-initialize">
+                    <i class="ri-refresh-line"></i> Initialize Machine
+                 </button>
+                 
+                 <!-- Hidden inputs logically kept for app.js but not prominent -->
+                 <div style="display:none;"><input type="number" id="max-steps" value="10000" min="100" max="1000000"></div>
+              </div>
+           </div>
+
+           <!-- Live Log -->
+           <div class="card log-card">
+              <div class="card-header log-header">
+                 <h4><i class="ri-list-check"></i> Execution Log</h4>
+              </div>
+              <!-- Transition formula display pushed inside log header nicely -->
+              <div class="transition-banner" id="transition-display">
+                 <span class="transition-label">Current Transition:</span>
+                 <span class="transition-formula" id="transition-formula">—</span>
+              </div>
+              <div class="log-container" id="log-container">
+                 <div class="log-empty">Initialize and run to view execution steps.</div>
+              </div>
+           </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <script>
+/* ===== Turing Machine Simulator ===== *
+ * Features:
+ *   - Preset Turing machine programs
+ *   - Step-by-step and auto-run execution
+ *   - Step-back (undo) capability
+ *   - Live transition diagram (canvas-based)
+ *   - Execution log
+ * Removed features: Reverse Function, Power of 2 Checker
+ ======================================= */
+
+// ── Preset Definitions ──────────────────────────────────────────────
+const PRESETS = {
+  straight_machine: {
+    name: "Straight Transitions (q0-q4)",
+    description: "Moves sequentially from q0 to q1 to q2 to q3 to q4 to qh. Reads x and y without overwriting them (reads x writes x), maintaining the original tape symbols.",
+    input: "xyyx",
+    startState: "q0",
+    haltState: "qh",
+    blankSymbol: "x",
+    transitions: [
+      { currentState: "q0", readSymbol: "x", writeSymbol: "x", direction: "R", nextState: "q1" },
+      { currentState: "q0", readSymbol: "y", writeSymbol: "y", direction: "R", nextState: "q1" },
+      { currentState: "q1", readSymbol: "x", writeSymbol: "x", direction: "R", nextState: "q2" },
+      { currentState: "q1", readSymbol: "y", writeSymbol: "y", direction: "R", nextState: "q2" },
+      { currentState: "q2", readSymbol: "x", writeSymbol: "x", direction: "R", nextState: "q3" },
+      { currentState: "q2", readSymbol: "y", writeSymbol: "y", direction: "R", nextState: "q3" },
+      { currentState: "q3", readSymbol: "x", writeSymbol: "x", direction: "R", nextState: "q4" },
+      { currentState: "q3", readSymbol: "y", writeSymbol: "y", direction: "R", nextState: "q4" },
+      { currentState: "q4", readSymbol: "x", writeSymbol: "x", direction: "R", nextState: "qh" },
+      { currentState: "q4", readSymbol: "y", writeSymbol: "y", direction: "R", nextState: "qh" }
+    ]
+  },
+  replace_0s: {
+    name: "Replace 0s with 1s",
+    description: "Scans the tape from left to right, replacing every 0 with a 1. Demonstrates the simplest read-write-move pattern of a Turing Machine.",
+    input: "00100",
+    startState: "q0",
+    haltState: "qH",
+    blankSymbol: "_",
+    transitions: [
+      { currentState: "q0", readSymbol: "0", writeSymbol: "1", direction: "R", nextState: "q0" },
+      { currentState: "q0", readSymbol: "1", writeSymbol: "1", direction: "R", nextState: "q0" },
+      { currentState: "q0", readSymbol: "_", writeSymbol: "_", direction: "L", nextState: "qH" },
+    ]
+  },
+  binary_increment: {
+    name: "Binary Increment",
+    description: "Increments a binary number by 1. First moves to the rightmost digit, then propagates the carry from right to left. For example, 1011 (11) becomes 1100 (12).",
+    input: "1011",
+    startState: "q0",
+    haltState: "qH",
+    blankSymbol: "_",
+    transitions: [
+      { currentState: "q0", readSymbol: "0", writeSymbol: "0", direction: "R", nextState: "q0" },
+      { currentState: "q0", readSymbol: "1", writeSymbol: "1", direction: "R", nextState: "q0" },
+      { currentState: "q0", readSymbol: "_", writeSymbol: "_", direction: "L", nextState: "q1" },
+      { currentState: "q1", readSymbol: "0", writeSymbol: "1", direction: "L", nextState: "qH" },
+      { currentState: "q1", readSymbol: "1", writeSymbol: "0", direction: "L", nextState: "q1" },
+      { currentState: "q1", readSymbol: "_", writeSymbol: "1", direction: "R", nextState: "qH" },
+    ]
+  },
+  palindrome: {
+    name: "Palindrome Checker",
+    description: "Checks if a binary string is a palindrome. Q0→Q3 top row, Q4→Q6 bottom row, Q7 accept. Uses 0,1,B symbols. Mismatches route through Q6 to reject.",
+    input: "0110",
+    startState: "Q0",
+    haltState: "Q7",
+    blankSymbol: "B",
+    layoutPreset: "palindrome",
+    transitions: [
+      { currentState: "Q0", readSymbol: "0", writeSymbol: "B", direction: "R", nextState: "Q1" },
+      { currentState: "Q0", readSymbol: "1", writeSymbol: "B", direction: "R", nextState: "Q4" },
+      { currentState: "Q0", readSymbol: "B", writeSymbol: "B", direction: "R", nextState: "Q7" },
+      { currentState: "Q1", readSymbol: "0", writeSymbol: "0", direction: "R", nextState: "Q1" },
+      { currentState: "Q1", readSymbol: "1", writeSymbol: "1", direction: "R", nextState: "Q1" },
+      { currentState: "Q1", readSymbol: "B", writeSymbol: "B", direction: "L", nextState: "Q2" },
+      { currentState: "Q2", readSymbol: "0", writeSymbol: "B", direction: "L", nextState: "Q3" },
+      { currentState: "Q2", readSymbol: "1", writeSymbol: "1", direction: "L", nextState: "Q6" },
+      { currentState: "Q2", readSymbol: "B", writeSymbol: "B", direction: "R", nextState: "Q7" },
+      { currentState: "Q3", readSymbol: "0", writeSymbol: "0", direction: "L", nextState: "Q3" },
+      { currentState: "Q3", readSymbol: "1", writeSymbol: "1", direction: "L", nextState: "Q3" },
+      { currentState: "Q3", readSymbol: "B", writeSymbol: "B", direction: "R", nextState: "Q0" },
+      { currentState: "Q4", readSymbol: "0", writeSymbol: "0", direction: "R", nextState: "Q4" },
+      { currentState: "Q4", readSymbol: "1", writeSymbol: "1", direction: "R", nextState: "Q4" },
+      { currentState: "Q4", readSymbol: "B", writeSymbol: "B", direction: "L", nextState: "Q5" },
+      { currentState: "Q5", readSymbol: "1", writeSymbol: "B", direction: "L", nextState: "Q3" },
+      { currentState: "Q5", readSymbol: "0", writeSymbol: "0", direction: "L", nextState: "Q6" },
+      { currentState: "Q5", readSymbol: "B", writeSymbol: "B", direction: "R", nextState: "Q7" },
+      { currentState: "Q6", readSymbol: "0", writeSymbol: "0", direction: "R", nextState: "reject" },
+      { currentState: "Q6", readSymbol: "1", writeSymbol: "1", direction: "R", nextState: "reject" },
+      { currentState: "Q6", readSymbol: "B", writeSymbol: "B", direction: "R", nextState: "reject" },
+    ]
+  },
+  anbn: {
+    name: "0ⁿ1ⁿ Recognizer",
+    description: "Recognizes strings of the form 0ⁿ1ⁿ (equal number of 0s followed by equal number of 1s). Uses X and Y markers to cross off matched pairs. Accepts: 01, 0011, 000111. Rejects: 011, 0010.",
+    input: "000111",
+    startState: "q0",
+    haltState: "accept",
+    blankSymbol: "_",
+    layoutPreset: "anbn",
+    transitions: [
+      { currentState: "q0", readSymbol: "0", writeSymbol: "X", direction: "R", nextState: "q1" },
+      { currentState: "q0", readSymbol: "Y", writeSymbol: "Y", direction: "R", nextState: "q3" },
+      { currentState: "q0", readSymbol: "_", writeSymbol: "_", direction: "R", nextState: "accept" },
+      { currentState: "q1", readSymbol: "0", writeSymbol: "0", direction: "R", nextState: "q1" },
+      { currentState: "q1", readSymbol: "Y", writeSymbol: "Y", direction: "R", nextState: "q1" },
+      { currentState: "q1", readSymbol: "1", writeSymbol: "Y", direction: "L", nextState: "q2" },
+      { currentState: "q1", readSymbol: "_", writeSymbol: "_", direction: "R", nextState: "reject" },
+      { currentState: "q2", readSymbol: "0", writeSymbol: "0", direction: "L", nextState: "q2" },
+      { currentState: "q2", readSymbol: "Y", writeSymbol: "Y", direction: "L", nextState: "q2" },
+      { currentState: "q2", readSymbol: "X", writeSymbol: "X", direction: "R", nextState: "q0" },
+      { currentState: "q3", readSymbol: "Y", writeSymbol: "Y", direction: "R", nextState: "q3" },
+      { currentState: "q3", readSymbol: "_", writeSymbol: "_", direction: "R", nextState: "accept" },
+      { currentState: "q3", readSymbol: "0", writeSymbol: "0", direction: "R", nextState: "reject" },
+      { currentState: "q3", readSymbol: "1", writeSymbol: "1", direction: "R", nextState: "reject" },
+    ]
+  },
+  busy_beaver: {
+    name: "Busy Beaver (3-state)",
+    description: "The famous 3-state Busy Beaver — a Turing Machine that writes the maximum possible number of 1s on a blank tape before halting. Starts on a blank tape and produces six 1s.",
+    input: "",
+    startState: "A",
+    haltState: "HALT",
+    blankSymbol: "_",
+    transitions: [
+      { currentState: "A", readSymbol: "_", writeSymbol: "1", direction: "R", nextState: "B" },
+      { currentState: "A", readSymbol: "1", writeSymbol: "1", direction: "L", nextState: "C" },
+      { currentState: "B", readSymbol: "_", writeSymbol: "1", direction: "L", nextState: "A" },
+      { currentState: "B", readSymbol: "1", writeSymbol: "1", direction: "R", nextState: "B" },
+      { currentState: "C", readSymbol: "_", writeSymbol: "1", direction: "L", nextState: "B" },
+      { currentState: "C", readSymbol: "1", writeSymbol: "1", direction: "R", nextState: "HALT" },
+    ]
+  },
+
+};
+
+// ── Turing Machine Engine ───────────────────────────────────────────
+class TuringMachine {
+  constructor() {
+    this.reset();
+  }
+
+  reset() {
+    this.tape = [];
+    this.headPosition = 0;
+    this.currentState = "";
+    this.startState = "";
+    this.haltState = "";
+    this.blankSymbol = "_";
+    this.transitions = [];
+    this.stepCount = 0;
+    this.halted = false;
+    this.haltReason = "";
+    this.tapeOffset = 0; // tracks how many cells were prepended
+    this.history = []; // state snapshots
+  }
+
+  initialize(input, startState, haltState, blankSymbol, transitions) {
+    this.reset();
+    this.blankSymbol = blankSymbol || "_";
+    this.startState = startState;
+    this.haltState = haltState;
+    this.currentState = startState;
+    this.transitions = transitions;
+
+    if (input && input.length > 0) {
+      this.tape = input.split("");
+    } else {
+      this.tape = [this.blankSymbol];
+    }
+    this.headPosition = 0;
+    this.tapeOffset = 0;
+  }
+
+  // Get the absolute (logical) position of the head
+  getLogicalHeadPosition() {
+    return this.headPosition - this.tapeOffset;
+  }
+
+  step() {
+    if (this.halted) {
+      return { halted: true, reason: this.haltReason };
+    }
+
+    // Save history snapshot before modifying
+    this.history.push({
+      tape: [...this.tape],
+      headPosition: this.headPosition,
+      currentState: this.currentState,
+      tapeOffset: this.tapeOffset,
+      stepCount: this.stepCount,
+      halted: this.halted,
+      haltReason: this.haltReason
+    });
+    if (this.history.length > 500) this.history.shift();
+
+    // Check if current state is a halt state
+    if (this.currentState === this.haltState) {
+      this.halted = true;
+      this.haltReason = "halt";
+      return { halted: true, reason: "halt" };
+    }
+
+    // Special named halt states
+    const lowerState = this.currentState.toLowerCase();
+    if (lowerState === "accept" || lowerState === "qaccept") {
+      this.halted = true;
+      this.haltReason = "accepted";
+      return { halted: true, reason: "accepted" };
+    }
+    if (lowerState === "reject" || lowerState === "qreject") {
+      this.halted = true;
+      this.haltReason = "rejected";
+      return { halted: true, reason: "rejected" };
+    }
+
+    const currentSymbol = this.tape[this.headPosition] ?? this.blankSymbol;
+
+    // Find matching transition
+    const transition = this.transitions.find(
+      t => t.currentState === this.currentState && t.readSymbol === currentSymbol
+    );
+
+    if (!transition) {
+      this.halted = true;
+      this.haltReason = "no_transition";
+      return {
+        halted: true,
+        reason: "no_transition",
+        state: this.currentState,
+        symbol: currentSymbol
+      };
+    }
+
+    const result = {
+      halted: false,
+      stepNumber: this.stepCount + 1,
+      prevState: this.currentState,
+      readSymbol: currentSymbol,
+      writeSymbol: transition.writeSymbol,
+      direction: transition.direction,
+      nextState: transition.nextState,
+      prevHeadPos: this.headPosition,
+      newHeadPos: null,
+      tapeExtended: null,
+    };
+
+    // Write symbol
+    this.tape[this.headPosition] = transition.writeSymbol;
+
+    // Move head
+    if (transition.direction === "R") {
+      this.headPosition++;
+      if (this.headPosition >= this.tape.length) {
+        this.tape.push(this.blankSymbol);
+        result.tapeExtended = "right";
+      }
+    } else if (transition.direction === "L") {
+      if (this.headPosition === 0) {
+        this.tape.unshift(this.blankSymbol);
+        this.tapeOffset++;
+        result.tapeExtended = "left";
+        // headPosition stays at 0 (pointing to the new prepended blank)
+      } else {
+        this.headPosition--;
+      }
+    }
+    // direction "S" (stay) — no movement
+
+    result.newHeadPos = this.headPosition;
+
+    // Update state
+    this.currentState = transition.nextState;
+    this.stepCount++;
+
+    return result;
+  }
+
+  getTapeString() {
+    return this.tape.join("");
+  }
+
+  // Get tape contents trimmed of leading/trailing blanks
+  getTapeResult() {
+    let start = 0;
+    let end = this.tape.length - 1;
+    while (start <= end && this.tape[start] === this.blankSymbol) start++;
+    while (end >= start && this.tape[end] === this.blankSymbol) end--;
+    if (start > end) return this.blankSymbol;
+    return this.tape.slice(start, end + 1).join("");
+  }
+
+  stepBack() {
+    if (this.history.length === 0) return false;
+    const snapshot = this.history.pop();
+    this.tape = snapshot.tape;
+    this.headPosition = snapshot.headPosition;
+    this.currentState = snapshot.currentState;
+    this.tapeOffset = snapshot.tapeOffset;
+    this.stepCount = snapshot.stepCount;
+    this.halted = snapshot.halted;
+    this.haltReason = snapshot.haltReason;
+    return true;
+  }
+}
+
+// ── UI Controller ───────────────────────────────────────────────────
+class TuringMachineUI {
+  constructor() {
+    this.tm = new TuringMachine();
+    this.initialized = false;
+    this.running = false;
+    this.runTimer = null;
+    this.activeRuleIndex = -1;
+    this.VISIBLE_CELLS_PADDING = 5;
+    this.zoomLevel = 1.0; 
+
+    this.cacheDOM();
+    this.bindEvents();
+    this.loadPreset("replace_0s");
+    document.getElementById("preset-select").value = "replace_0s";
+    
+    this._initZoomControls();
+  }
+
+  _initZoomControls() {
+    const btnIn = document.getElementById('btn-zoom-in');
+    const btnOut = document.getElementById('btn-zoom-out');
+    const btnReset = document.getElementById('btn-zoom-reset');
+
+    if (btnIn) btnIn.addEventListener('click', () => { this.zoomLevel = Math.min(3.0, this.zoomLevel + 0.1); this.updateZoomUI(); this.renderDiagram(); });
+    if (btnOut) btnOut.addEventListener('click', () => { this.zoomLevel = Math.max(0.2, this.zoomLevel - 0.1); this.updateZoomUI(); this.renderDiagram(); });
+    if (btnReset) btnReset.addEventListener('click', () => { this.zoomLevel = 1.0; this.updateZoomUI(); this.renderDiagram(); });
+  }
+
+  updateZoomUI() {
+    const zoomVal = document.getElementById('zoom-value');
+    if (zoomVal) zoomVal.innerText = `${Math.round(this.zoomLevel * 100)}%`;
+  }
+
+  cacheDOM() {
+    this.els = {
+      presetSelect: document.getElementById("preset-select"),
+      presetDesc: document.getElementById("preset-description"),
+      tape: document.getElementById("tape"),
+      tapeScroll: document.getElementById("tape-scroll"),
+      head: document.getElementById("head"),
+      headContainer: document.getElementById("head-container"),
+      transitionFormula: document.getElementById("transition-formula"),
+      stepCount: document.getElementById("step-count"),
+      currentStateVal: document.getElementById("current-state-val"),
+      headPosVal: document.getElementById("head-pos-val"),
+      statusIndicator: document.getElementById("status-indicator"),
+      statusVal: document.getElementById("status-val"),
+      btnReset: document.getElementById("btn-reset"),
+      btnStep: document.getElementById("btn-step"),
+      btnRun: document.getElementById("btn-run"),
+      btnPause: document.getElementById("btn-pause"),
+      btnBack: document.getElementById("btn-back"),
+      btnInitialize: document.getElementById("btn-initialize"),
+      btnAddRule: document.getElementById("btn-add-rule"),
+      speedSlider: document.getElementById("speed-slider"),
+      speedValue: document.getElementById("speed-value"),
+      maxSteps: document.getElementById("max-steps"),
+      inputString: document.getElementById("input-string"),
+      startState: document.getElementById("start-state"),
+      haltState: document.getElementById("halt-state"),
+      blankSymbol: document.getElementById("blank-symbol"),
+      rulesBody: document.getElementById("rules-body"),
+      validationMsg: document.getElementById("validation-msg"),
+      logContainer: document.getElementById("log-container"),
+      diagramContainer: document.getElementById("diagram-container"),
+      explicitStates: document.getElementById("explicit-states"),
+      explicitAlphabet: document.getElementById("explicit-alphabet")
+    };
+  }
+
+  bindEvents() {
+    this.els.presetSelect.addEventListener("change", () => {
+      const val = this.els.presetSelect.value;
+      if (val) this.loadPreset(val);
+      else this.clearPresetDesc();
+    });
+
+    this.els.btnInitialize.addEventListener("click", () => this.initializeMachine());
+    this.els.btnReset.addEventListener("click", () => this.resetMachine());
+    this.els.btnStep.addEventListener("click", () => this.stepMachine());
+    this.els.btnRun.addEventListener("click", () => this.startRunning());
+    this.els.btnPause.addEventListener("click", () => this.stopRunning());
+    
+    if(this.els.btnBack) {
+       this.els.btnBack.addEventListener("click", () => this.stepBackUI());
+    }
+    this.els.btnAddRule.addEventListener("click", () => this.addRuleRow());
+
+    // Update diagram automatically on explicit config blur
+    if(this.els.explicitStates) this.els.explicitStates.addEventListener("blur", () => this.renderDiagram());
+    if(this.els.explicitAlphabet) this.els.explicitAlphabet.addEventListener("blur", () => this.renderDiagram());
+    if(this.els.startState) this.els.startState.addEventListener("blur", () => this.renderDiagram());
+    if(this.els.haltState) this.els.haltState.addEventListener("blur", () => this.renderDiagram());
+
+    this.els.speedSlider.addEventListener("input", () => {
+      this.els.speedValue.textContent = `${this.els.speedSlider.value} steps/s`;
+    });
+
+    // Theme Toggle Logic
+    const themeToggle = document.getElementById("theme-toggle");
+    if (themeToggle) {
+      const currentTheme = localStorage.getItem('theme') || 'dark';
+      if (currentTheme === 'light') {
+        document.body.classList.remove('dark-theme');
+        document.body.classList.add('light-theme');
+        document.querySelector('.theme-icon-light').style.display = 'none';
+        document.querySelector('.theme-icon-dark').style.display = 'inline-block';
+      }
+
+      themeToggle.addEventListener('click', () => {
+        const isDark = document.body.classList.contains('dark-theme');
+        if (isDark) {
+          document.body.classList.replace('dark-theme', 'light-theme');
+          document.querySelector('.theme-icon-light').style.display = 'none';
+          document.querySelector('.theme-icon-dark').style.display = 'inline-block';
+          localStorage.setItem('theme', 'light');
+        } else {
+          document.body.classList.replace('light-theme', 'dark-theme');
+          document.querySelector('.theme-icon-dark').style.display = 'none';
+          document.querySelector('.theme-icon-light').style.display = 'inline-block';
+          localStorage.setItem('theme', 'dark');
+        }
+      });
+    }
+  }
+
+  // ── Presets ─────────────────────────────────────────────────────
+  loadPreset(key) {
+    const preset = PRESETS[key];
+    if (!preset) return;
+
+    this.stopRunning();
+
+    this.els.inputString.value = preset.input;
+    this.els.startState.value = preset.startState;
+    this.els.haltState.value = preset.haltState;
+    this.els.blankSymbol.value = preset.blankSymbol;
+
+    // Populate rules table
+    this.els.rulesBody.innerHTML = "";
+    preset.transitions.forEach(t => this.addRuleRow(t));
+
+    // Show description
+    this.els.presetDesc.textContent = preset.description;
+    this.els.presetDesc.classList.add("visible");
+
+    // Auto-initialize
+    this.initializeMachine();
+  }
+
+  clearPresetDesc() {
+    this.els.presetDesc.classList.remove("visible");
+  }
+
+  // ── Rules Table ─────────────────────────────────────────────────
+  addRuleRow(data = null) {
+    const tr = document.createElement("tr");
+    const fields = [
+      { name: "currentState", placeholder: "q0", value: data?.currentState ?? "" },
+      { name: "readSymbol", placeholder: "_", value: data?.readSymbol ?? "" },
+      { name: "writeSymbol", placeholder: "_", value: data?.writeSymbol ?? "" },
+    ];
+
+    fields.forEach(f => {
+      const td = document.createElement("td");
+      const input = document.createElement("input");
+      input.type = "text";
+      input.name = f.name;
+      input.placeholder = f.placeholder;
+      input.value = f.value;
+      input.spellcheck = false;
+      td.appendChild(input);
+      tr.appendChild(td);
+    });
+
+    // Direction select
+    const tdDir = document.createElement("td");
+    const select = document.createElement("select");
+    select.name = "direction";
+    ["L", "R", "S"].forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = d;
+      opt.textContent = d;
+      select.appendChild(opt);
+    });
+    select.value = data?.direction ?? "R";
+    tdDir.appendChild(select);
+    tr.appendChild(tdDir);
+
+    // Next state
+    const tdNext = document.createElement("td");
+    const inputNext = document.createElement("input");
+    inputNext.type = "text";
+    inputNext.name = "nextState";
+    inputNext.placeholder = "q1";
+    inputNext.value = data?.nextState ?? "";
+    inputNext.spellcheck = false;
+    tdNext.appendChild(inputNext);
+    tr.appendChild(tdNext);
+
+    // Delete button
+    const tdDel = document.createElement("td");
+    const btnDel = document.createElement("button");
+    btnDel.className = "btn-danger-small";
+    btnDel.textContent = "✕";
+    btnDel.title = "Remove rule";
+    btnDel.addEventListener("click", () => tr.remove());
+    tdDel.appendChild(btnDel);
+    tr.appendChild(tdDel);
+
+    this.els.rulesBody.appendChild(tr);
+  }
+
+  readTransitionsFromTable() {
+    const rows = this.els.rulesBody.querySelectorAll("tr");
+    const transitions = [];
+    const errors = [];
+
+    rows.forEach((row, idx) => {
+      const inputs = row.querySelectorAll("input");
+      const select = row.querySelector("select");
+
+      const t = {
+        currentState: inputs[0].value.trim(),
+        readSymbol: inputs[1].value.trim(),
+        writeSymbol: inputs[2].value.trim(),
+        direction: select.value,
+        nextState: inputs[3].value.trim(),
+      };
+
+      // Validation
+      if (!t.currentState) errors.push(`Row ${idx + 1}: Current state is empty.`);
+      if (!t.readSymbol) errors.push(`Row ${idx + 1}: Read symbol is empty.`);
+      if (!t.writeSymbol) errors.push(`Row ${idx + 1}: Write symbol is empty.`);
+      if (!t.nextState) errors.push(`Row ${idx + 1}: Next state is empty.`);
+      if (t.readSymbol.length > 1) errors.push(`Row ${idx + 1}: Read symbol must be a single character.`);
+      if (t.writeSymbol.length > 1) errors.push(`Row ${idx + 1}: Write symbol must be a single character.`);
+
+      transitions.push(t);
+    });
+
+    // Check duplicates
+    const seen = new Set();
+    transitions.forEach((t, idx) => {
+      const key = `${t.currentState}|${t.readSymbol}`;
+      if (seen.has(key)) {
+        errors.push(`Row ${idx + 1}: Duplicate transition for (${t.currentState}, ${t.readSymbol}).`);
+      }
+      seen.add(key);
+    });
+
+    return { transitions, errors };
+  }
+
+  // ── Machine Control ─────────────────────────────────────────────
+  initializeMachine() {
+    this.stopRunning();
+
+    const { transitions, errors } = this.readTransitionsFromTable();
+
+    if (transitions.length === 0) {
+      this.showValidation("Add at least one transition rule.", "error");
+      return;
+    }
+
+    if (errors.length > 0) {
+      this.showValidation(errors[0], "error");
+      return;
+    }
+
+    const blank = this.els.blankSymbol.value.trim() || "_";
+    if (blank.length !== 1) {
+      this.showValidation("Blank symbol must be exactly one character.", "error");
+      return;
+    }
+
+    const startState = this.els.startState.value.trim();
+    const haltState = this.els.haltState.value.trim();
+
+    if (!startState) {
+      this.showValidation("Start state cannot be empty.", "error");
+      return;
+    }
+    if (!haltState) {
+      this.showValidation("Halt state cannot be empty.", "error");
+      return;
+    }
+
+    this.showValidation("", "");
+
+    const input = this.els.inputString.value;
+    this.tm.initialize(input, startState, haltState, blank, transitions);
+    this.initialized = true;
+    this.activeRuleIndex = -1;
+    this.lastStepResult = null;
+
+    this.updateStatus("Ready", "ready");
+    this.renderTape();
+    this.updateInfoBar();
+    this.renderDiagram();
+    this.els.transitionFormula.textContent = "—";
+    this.clearLog();
+  }
+
+  resetMachine() {
+    this.stopRunning();
+    this.lastStepResult = null;
+    if (this.initialized) {
+      this.initializeMachine();
+    }
+  }
+
+  stepMachine() {
+    if (!this.initialized) {
+      this.showValidation("Initialize the machine first.", "warning");
+      return;
+    }
+
+    if (this.tm.halted) {
+      return;
+    }
+
+    const maxSteps = parseInt(this.els.maxSteps.value) || 10000;
+    if (this.tm.stepCount >= maxSteps) {
+      this.stopRunning();
+      this.tm.halted = true;
+      this.tm.haltReason = "max_steps";
+      this.updateStatus("Max Steps Reached", "error");
+      this.addLogHalt(`Maximum step limit (${maxSteps}) reached. The machine may be in an infinite loop.`, "halted");
+      return;
+    }
+
+    const result = this.tm.step();
+
+    if (result.halted) {
+      this.handleHalt(result);
+    } else {
+      this.highlightActiveRule(result.prevState, result.readSymbol);
+      this.els.transitionFormula.textContent =
+        `δ(${result.prevState}, ${result.readSymbol}) = (${result.nextState}, ${result.writeSymbol}, ${result.direction})`;
+      this.addLogEntry(result);
+      this.updateStatus("Running", "running");
+      this.lastStepResult = result;
+      this.triggerDiagramAnimation(result);
+    }
+
+    this.renderTape(result.halted ? -1 : this.tm.headPosition);
+    this.updateInfoBar();
+    this.renderDiagram();
+  }
+
+  stepBackUI() {
+    // Stop any running simulation
+    this.stopRunning();
+    if (!this.initialized) return;
+
+    // Attempt to restore the previous machine state from history
+    if (this.tm.stepBack()) {
+      // Clear the last step result so the diagram doesn't highlight a stale transition
+      this.lastStepResult = null;
+
+      // Update all UI components to reflect the restored state
+      this.updateStatus(this.tm.halted ? "Halted" : "Ready (Backed)", this.tm.halted ? "halted" : "ready");
+      this.renderTape();
+      this.updateInfoBar();
+      this.renderDiagram();
+      this.els.transitionFormula.textContent = "— Stepped Back —";
+
+      // Append a marker in the log so the user can track the back operation
+      const div = document.createElement("div");
+      div.className = "log-halt halted";
+      div.textContent = `← Stepped Back to Step ${this.tm.stepCount}`;
+      this.els.logContainer.appendChild(div);
+      this.els.logContainer.scrollTop = this.els.logContainer.scrollHeight;
+    }
+  }
+
+  startRunning() {
+    if (!this.initialized) {
+      this.showValidation("Initialize the machine first.", "warning");
+      return;
+    }
+    if (this.tm.halted) return;
+
+    this.running = true;
+    this.els.btnRun.disabled = true;
+    this.els.btnStep.disabled = true;
+    if(this.els.btnBack) this.els.btnBack.disabled = true;
+    this.els.btnPause.disabled = false;
+
+    const runStep = () => {
+      if (!this.running) return;
+      this.stepMachine();
+      if (this.tm.halted) {
+        this.stopRunning();
+        return;
+      }
+      const speed = parseInt(this.els.speedSlider.value) || 5;
+      const delay = Math.max(20, 1000 / speed);
+      this.runTimer = setTimeout(runStep, delay);
+    };
+
+    runStep();
+  }
+
+  stopRunning() {
+    this.running = false;
+    if (this.runTimer) {
+      clearTimeout(this.runTimer);
+      this.runTimer = null;
+    }
+    this.els.btnRun.disabled = false;
+    this.els.btnStep.disabled = false;
+    if(this.els.btnBack) this.els.btnBack.disabled = false;
+    this.els.btnPause.disabled = true;
+  }
+
+  handleHalt(result) {
+    this.stopRunning();
+
+    switch (result.reason) {
+      case "accepted":
+        this.updateStatus("Accepted ✓", "accepted");
+        this.addLogHalt(`Machine ACCEPTED the input. Final tape: ${this.tm.getTapeResult()}`, "accepted");
+        break;
+      case "rejected":
+        this.updateStatus("Rejected ✗", "rejected");
+        this.addLogHalt(`Machine REJECTED the input. Final tape: ${this.tm.getTapeResult()}`, "rejected");
+        break;
+      case "halt":
+        this.updateStatus("Halted", "halted");
+        this.addLogHalt(`Machine halted in state "${this.tm.haltState}". Result: ${this.tm.getTapeResult()}`, "halted");
+        break;
+      case "no_transition":
+        this.updateStatus("Halted (no rule)", "halted");
+        this.addLogHalt(
+          `No transition defined for δ(${result.state}, ${result.symbol}). Machine halted. Result: ${this.tm.getTapeResult()}`,
+          "halted"
+        );
+        break;
+      case "max_steps":
+        break; // already handled
+      default:
+        this.updateStatus("Halted", "halted");
+        this.addLogHalt(`Machine halted. Result: ${this.tm.getTapeResult()}`, "halted");
+    }
+
+    this.els.transitionFormula.textContent = "— Machine Halted —";
+  }
+
+  // ── Tape Rendering ──────────────────────────────────────────────
+  renderTape(highlightWritePos = -1) {
+    const tape = this.tm.tape;
+    const headPos = this.tm.headPosition;
+    const blank = this.tm.blankSymbol;
+
+    // Add padding cells
+    const padLeft = this.VISIBLE_CELLS_PADDING;
+    const padRight = this.VISIBLE_CELLS_PADDING;
+
+    this.els.tape.innerHTML = "";
+
+    const totalCells = padLeft + tape.length + padRight;
+    const startIdx = -padLeft;
+
+    for (let i = 0; i < totalCells; i++) {
+      const tapeIdx = i - padLeft;
+      const cell = document.createElement("div");
+      cell.className = "tape-cell";
+
+      let symbol;
+      if (tapeIdx >= 0 && tapeIdx < tape.length) {
+        symbol = tape[tapeIdx];
+      } else {
+        symbol = blank;
+      }
+      cell.textContent = symbol;
+
+      if (tapeIdx === headPos) {
+        cell.classList.add("active");
+        if (this.tm.halted) {
+          cell.classList.add("halted");
+        }
+        if (highlightWritePos === headPos && !this.tm.halted) {
+          cell.classList.add("just-written");
+        }
+      }
+
+      // Index label
+      const indexLabel = document.createElement("span");
+      indexLabel.className = "cell-index";
+      indexLabel.textContent = tapeIdx - this.tm.tapeOffset;
+      cell.appendChild(indexLabel);
+
+      this.els.tape.appendChild(cell);
+    }
+
+    // Position head indicator
+    this.positionHead(headPos + padLeft, totalCells);
+
+    // Scroll to keep head visible
+    requestAnimationFrame(() => {
+      const activeCell = this.els.tape.querySelector(".tape-cell.active");
+      if (activeCell) {
+        activeCell.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      }
+    });
+  }
+
+  positionHead(cellIndex, totalCells) {
+    if (totalCells === 0) return;
+
+    const cells = this.els.tape.querySelectorAll(".tape-cell");
+    if (cellIndex < 0 || cellIndex >= cells.length) return;
+
+    const targetCell = cells[cellIndex];
+    const tapeRect = this.els.tape.getBoundingClientRect();
+    const cellRect = targetCell.getBoundingClientRect();
+
+    // Calculate position relative to tape container
+    const cellCenter = cellRect.left - tapeRect.left + cellRect.width / 2;
+
+    this.els.head.style.left = `${cellCenter}px`;
+    this.els.head.style.transform = "translateX(-50%)";
+
+    const isHalt     = this.tm.halted;
+    const isAccepted = this.tm.haltReason === "accepted";
+    const isRejected = this.tm.haltReason === "rejected";
+
+    // ── State label at head pointer ──
+    // While running: show current state (q0, q1 … )
+    // When halted:   show "qH" (final halt state name)
+    let stateLabel = this.els.head.querySelector(".head-state-label");
+    if (!stateLabel) {
+      stateLabel = document.createElement("div");
+      stateLabel.className = "head-state-label";
+      this.els.head.appendChild(stateLabel);
+    }
+    const displayState = isHalt
+      ? (this.tm.currentState || "qH")   // always show final state when halted
+      : (this.tm.currentState || "");
+    stateLabel.textContent = displayState;
+    stateLabel.style.color = "";           // reset — background pill handles color
+    stateLabel.className   = "head-state-label" + (isHalt ? " halt" : "");
+
+    // ── ACCEPT / REJECT label under the tape cell symbol ──
+    // Remove any previous result label on all cells first
+    this.els.tape.querySelectorAll(".cell-result-label").forEach(el => el.remove());
+
+    if (isHalt && (isAccepted || isRejected)) {
+      // Attach to the active (halted) cell — directly under its symbol text
+      const resultLbl = document.createElement("span");
+      resultLbl.className = "cell-result-label " + (isAccepted ? "accept" : "reject");
+      resultLbl.textContent = isAccepted ? "ACCEPT" : "REJECT";
+      targetCell.appendChild(resultLbl);
+    }
+  }
+
+  // ── Info Bar ────────────────────────────────────────────────────
+  updateInfoBar() {
+    this.els.stepCount.textContent = this.tm.stepCount;
+    this.els.currentStateVal.textContent = this.tm.currentState;
+    this.els.headPosVal.textContent = this.tm.getLogicalHeadPosition();
+  }
+
+  updateStatus(text, className) {
+    this.els.statusVal.textContent = text;
+    this.els.statusIndicator.className = "status-item status-indicator " + className;
+  }
+
+  // ── Rule Highlighting ──────────────────────────────────────────
+  highlightActiveRule(state, readSymbol) {
+    const rows = this.els.rulesBody.querySelectorAll("tr");
+    rows.forEach(row => row.classList.remove("active-rule"));
+
+    rows.forEach(row => {
+      const inputs = row.querySelectorAll("input");
+      if (inputs[0].value.trim() === state && inputs[1].value.trim() === readSymbol) {
+        row.classList.add("active-rule");
+      }
+    });
+  }
+
+  // ── Execution Log ──────────────────────────────────────────────
+  clearLog() {
+    this.els.logContainer.innerHTML =
+      '<div class="log-empty">Click <strong>Step</strong> or <strong>Run</strong> to begin execution.</div>';
+  }
+
+  addLogEntry(result) {
+    // Remove empty message
+    const empty = this.els.logContainer.querySelector(".log-empty");
+    if (empty) empty.remove();
+
+    const entry = document.createElement("div");
+    entry.className = "log-entry";
+    entry.innerHTML = `
+      <span class="log-step">#${result.stepNumber}</span>
+      <span class="log-detail">
+        <span class="state">${result.prevState}</span>,
+        <span class="symbol">${result.readSymbol}</span>
+        <span class="arrow">→</span>
+        <span class="state">${result.nextState}</span>,
+        <span class="symbol">${result.writeSymbol}</span>,
+        <span class="direction">${result.direction}</span>
+      </span>
+    `;
+
+    this.els.logContainer.appendChild(entry);
+    this.els.logContainer.scrollTop = this.els.logContainer.scrollHeight;
+  }
+
+  addLogHalt(message, type) {
+    const div = document.createElement("div");
+    div.className = `log-halt ${type}`;
+    div.textContent = message;
+    this.els.logContainer.appendChild(div);
+    this.els.logContainer.scrollTop = this.els.logContainer.scrollHeight;
+  }
+
+  // ── Validation ─────────────────────────────────────────────────
+  showValidation(msg, type) {
+    this.els.validationMsg.textContent = msg;
+    this.els.validationMsg.className = "validation-msg " + (type || "");
+  }
+
+  // ── Diagram Rendering (turingmachine.io exact style) ─────────
+  renderDiagram() {
+    if (!this.els.diagramContainer) return;
+
+    const container = this.els.diagramContainer;
+    const { transitions } = this.readTransitionsFromTable();
+
+    const explicitStatesStr = this.els.explicitStates ? this.els.explicitStates.value.trim() : "";
+    const explicitStates = explicitStatesStr ? explicitStatesStr.split(",").map(s => s.trim()).filter(s => s) : [];
+
+    const sState = this.els.startState.value.trim();
+    const hState = this.els.haltState.value.trim();
+
+    const stateOrder = [];
+    const stateSet = new Set();
+    const addState = (s) => { if (s && !stateSet.has(s)) { stateSet.add(s); stateOrder.push(s); } };
+
+    if (sState) addState(sState);
+    explicitStates.forEach(addState);
+    transitions.forEach(t => { addState(t.currentState); addState(t.nextState); });
+    if (hState) addState(hState);
+
+    if (stateOrder.length === 0) {
+      container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-mut);font-size:0.9rem;">No states defined</div>';
+      return;
+    }
+
+    const activePresetKey = this.els.presetSelect ? this.els.presetSelect.value : "";
+    // Build edge map grouped by (from -> to)
+    const edgeMap = new Map();
+    transitions.forEach(t => {
+      const key = `${t.currentState}|${t.nextState}`;
+      // Compact format: read,write,dir  (e.g. 1,0,R)
+      const labelPart = `${t.readSymbol},${t.writeSymbol},${t.direction}`;
+      const isEdgeActive = this.lastStepResult &&
+        this.lastStepResult.prevState === t.currentState &&
+        this.lastStepResult.readSymbol === t.readSymbol &&
+        this.lastStepResult.nextState === t.nextState;
+      if (!edgeMap.has(key)) {
+        edgeMap.set(key, { from: t.currentState, to: t.nextState, labels: [labelPart], isActive: isEdgeActive });
+      } else {
+        const e = edgeMap.get(key);
+        e.labels.push(labelPart);
+        if (isEdgeActive) e.isActive = true;
+      }
+    });
+
+    const isAcceptState = (id) => {
+      return id === hState ||
+        String(id).toLowerCase().includes('accept') ||
+        String(id).toLowerCase() === 'halt' ||
+        String(id).toLowerCase() === 'qh' ||
+        String(id).toLowerCase() === 'done';
+    };
+    const isStartState = (id) => id === sState;
+
+    // Setup canvas
+    const dpr = window.devicePixelRatio || 1;
+    let canvas = container.querySelector('canvas.tm-diagram-canvas');
+    if (!canvas) {
+      container.innerHTML = '';
+      canvas = document.createElement('canvas');
+      canvas.className = 'tm-diagram-canvas';
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+      canvas.style.display = 'block';
+      container.appendChild(canvas);
+    }
+
+    const rect = container.getBoundingClientRect();
+    const W = rect.width;
+    const H = rect.height;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    ctx.clearRect(0, 0, W, H);
+
+    const z = this.zoomLevel || 1.0;
+    ctx.translate(W/2, H/2);
+    ctx.scale(z, z);
+    ctx.translate(-W/2, -H/2);
+
+    // ── Color Palette (turingmachine.io exact colors) ──
+    const isDark = document.body.classList.contains('dark-theme');
+    const NODE_START    = '#4B9CD3';   // blue  — start state
+    const NODE_NORMAL   = '#F0A500';   // amber — intermediate
+    const NODE_ACCEPT   = '#3CB371';   // green — accept/halt
+    const NODE_ACTIVE_RING = '#FFD700';// gold halo when active
+    const EDGE_DEFAULT  = isDark ? '#8899AA' : '#607080';
+    const EDGE_ACTIVE   = '#E74C3C';   // red when transition fires
+    const LABEL_BG      = null; // handled inside _drawEdgeLabels
+    const WHITE         = '#FFFFFF';
+    const TEXT_DARK     = '#1A1A2E';
+
+    // ── Node Layout ──
+    const nodeRadius = 28;
+    const n = stateOrder.length;
+
+    // Get layoutPreset from active preset data if available
+    const activePreset = PRESETS[activePresetKey] || null;
+    const layoutPreset = activePreset ? activePreset.layoutPreset : null;
+
+    const nodePositions = new Map();
+
+    // ── PALINDROME: 2-row layout matching image exactly ──
+    // Top row: Q0 Q1 Q2 Q3   Bottom row: Q4 Q5 Q6   Bottom-left: Q7 (accept)
+    if (layoutPreset === "palindrome") {
+      const rowY1 = H * 0.28;   // top row
+      const rowY2 = H * 0.68;   // bottom row
+      const col0 = W * 0.10, col1 = W * 0.32, col2 = W * 0.54, col3 = W * 0.76;
+      const col4b = W * 0.32, col5b = W * 0.54, col6b = W * 0.76;
+      const q7x = W * 0.10, q7y = H * 0.68;
+      const pmap = {
+        "Q0": { x: col0, y: rowY1 },
+        "Q1": { x: col1, y: rowY1 },
+        "Q2": { x: col2, y: rowY1 },
+        "Q3": { x: col3, y: rowY1 },
+        "Q4": { x: col4b, y: rowY2 },
+        "Q5": { x: col5b, y: rowY2 },
+        "Q6": { x: col6b, y: rowY2 },
+        "reject": { x: W * 0.88, y: rowY2 },
+        "Q7": { x: q7x,   y: q7y   },
+      };
+      stateOrder.forEach(s => {
+        if (pmap[s]) nodePositions.set(s, pmap[s]);
+        else nodePositions.set(s, { x: W/2, y: H/2 });
+      });
+
+    // ── 0ⁿ1ⁿ RECOGNIZER: spacious 2-row layout, no overlaps ──
+    // Top row: q0, q1, q3, accept  (widely spaced)
+    // Bottom:  q2 (below q1), reject (below q3/accept area)
+    } else if (layoutPreset === "anbn") {
+      // Use wide horizontal spacing so arrows+labels never overlap
+      // Top row y = 28% of height, bottom row y = 72% of height
+      const abTop = H * 0.28;
+      const abBot = H * 0.72;
+      const abmap = {
+        "q0":     { x: W * 0.10, y: abTop },
+        "q1":     { x: W * 0.40, y: abTop },
+        "q3":     { x: W * 0.70, y: abTop },
+        "accept": { x: W * 0.90, y: abTop },
+        "q2":     { x: W * 0.25, y: abBot },
+        "reject": { x: W * 0.85, y: abBot },
+      };
+      stateOrder.forEach(s => {
+        if (abmap[s]) nodePositions.set(s, abmap[s]);
+        else nodePositions.set(s, { x: W/2, y: H/2 });
+      });
+
+    // ── DEFAULT: auto layout ──
+    } else {
+      const useCircular = n > 6;
+      if (useCircular) {
+        const cx = W / 2, cy = H / 2;
+        const r = Math.min(W, H) * 0.36;
+        stateOrder.forEach((state, i) => {
+          const angle = (2 * Math.PI * i / n) - Math.PI / 2;
+          nodePositions.set(state, { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
+        });
+      } else {
+        const totalW = n > 1 ? Math.min((n - 1) * 200, W - 140) : 0;
+        const spacing = n > 1 ? totalW / (n - 1) : 0;
+        const startX = (W - totalW) / 2;
+        const centerY = H / 2;
+        const stagger = n <= 3 ? 0 : 44;
+        stateOrder.forEach((state, i) => {
+          const yOff = stagger > 0 ? ((i % 2 === 0) ? -stagger : stagger) : 0;
+          nodePositions.set(state, { x: startX + i * spacing, y: centerY + yOff });
+        });
+      }
+    }
+
+    // Track which edges have a reverse counterpart (for curve direction)
+    const edgeKeys = new Set(edgeMap.keys());
+
+    // ── Draw Edges ──
+    edgeMap.forEach((edge) => {
+      const fromPos = nodePositions.get(edge.from);
+      const toPos   = nodePositions.get(edge.to);
+      if (!fromPos || !toPos) return;
+
+      const isLoop   = edge.from === edge.to;
+      const isActive = edge.isActive;
+      const lineColor  = isActive ? EDGE_ACTIVE : EDGE_DEFAULT;
+      const lineWidth  = isActive ? 2.5 : 1.8;
+      const labelColor = null; // colors handled inside _drawEdgeLabels
+
+      ctx.save();
+
+      if (isLoop) {
+        // ── SELF-LOOP: single clean cubic bezier only ──
+        // Attach points slightly left and right on top (or bottom) of the node
+        const loopDir = fromPos.y <= H / 2 ? -1 : 1; // -1 = loop goes UP, 1 = loop goes DOWN
+        const spread  = 14;   // horizontal spread of attach points on node rim
+        const reach   = (layoutPreset === 'anbn') ? 130 : 100;  // taller for anbn
+        const attach  = loopDir * nodeRadius;  // signed vertical offset to rim
+
+        // Start and end points sit on the node's rim, left/right of top or bottom
+        const sx  = fromPos.x - spread;
+        const sy  = fromPos.y + attach;
+        const ex  = fromPos.x + spread;
+        const ey  = fromPos.y + attach;
+
+        // Control points push the loop well outside the node
+        const cp1x = fromPos.x - spread * 2.8;
+        const cp1y = fromPos.y + loopDir * (nodeRadius + reach);
+        const cp2x = fromPos.x + spread * 2.8;
+        const cp2y = fromPos.y + loopDir * (nodeRadius + reach);
+
+        ctx.strokeStyle = lineColor;
+        ctx.lineWidth   = lineWidth;
+        ctx.shadowColor = lineColor;
+        ctx.shadowBlur  = isActive ? 12 : 4;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, ex, ey);
+        ctx.stroke();
+
+        // Arrowhead — tangent at end of cubic bezier (t=1)
+        const ahAngle = Math.atan2(ey - cp2y, ex - cp2x);
+        this._drawArrowhead(ctx, ex, ey, ahAngle, lineColor, lineColor, 10);
+
+        // Label ABOVE peak of loop — pushed 30px further out for clear visibility
+        const lblX = 0.125*sx + 0.375*cp1x + 0.375*cp2x + 0.125*ex;
+        const lblY = 0.125*sy + 0.375*cp1y + 0.375*cp2y + 0.125*ey + loopDir * 44;
+        this._drawEdgeLabels(ctx, edge.labels, lblX, lblY, labelColor, LABEL_BG, isActive);
+
+      } else {
+        // ── REGULAR TRANSITION: quadratic bezier ──
+        const reverseKey = `${edge.to}|${edge.from}`;
+        const hasBidirect = edgeKeys.has(reverseKey);
+        const dx = toPos.x - fromPos.x, dy = toPos.y - fromPos.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const ux = dx/dist, uy = dy/dist;
+        const px = -uy, py = ux; // perpendicular (left-hand side)
+
+        // anbn gets extra-large curve + label offset so nothing overlaps
+        const isAnbn = (layoutPreset === "anbn");
+        const curveAmt = isAnbn ? (hasBidirect ? 82 : 62) : (hasBidirect ? 48 : 28);
+        const lblOffset = isAnbn ? 68 : 42;
+
+        const x1 = fromPos.x + ux * (nodeRadius + 3);
+        const y1 = fromPos.y + uy * (nodeRadius + 3);
+        const x2 = toPos.x  - ux * (nodeRadius + 3);
+        const y2 = toPos.y  - uy * (nodeRadius + 3);
+
+        const midX = (x1 + x2) / 2 + px * curveAmt;
+        const midY = (y1 + y2) / 2 + py * curveAmt;
+
+        ctx.strokeStyle = lineColor;
+        ctx.lineWidth   = isAnbn ? 2.2 : lineWidth;
+        ctx.shadowColor = lineColor;
+        ctx.shadowBlur  = isActive ? 14 : 3;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.quadraticCurveTo(midX, midY, x2, y2);
+        ctx.stroke();
+
+        // Arrowhead tangent at t≈0.97
+        const tH = 0.97;
+        const tx = 2*(1-tH)*(midX-x1) + 2*tH*(x2-midX);
+        const ty = 2*(1-tH)*(midY-y1) + 2*tH*(y2-midY);
+        this._drawArrowhead(ctx, x2, y2, Math.atan2(ty, tx), lineColor, lineColor, isAnbn ? 13 : 11);
+
+        // Label above curve peak — perpendicular offset
+        const lblX = 0.25*x1 + 0.5*midX + 0.25*x2 + px * lblOffset;
+        const lblY = 0.25*y1 + 0.5*midY + 0.25*y2 + py * lblOffset;
+        this._drawEdgeLabels(ctx, edge.labels, lblX, lblY, labelColor, LABEL_BG, isActive);
+      }
+      ctx.restore();
+    });
+
+    // ── Start Arrow (entry indicator) ──
+    if (sState && nodePositions.has(sState)) {
+      const sp = nodePositions.get(sState);
+      const ax1 = sp.x - nodeRadius - 44;
+      const ax2 = sp.x - nodeRadius - 2;
+      ctx.save();
+      ctx.strokeStyle = isDark ? '#6B8CAE' : '#4A6880';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      ctx.moveTo(ax1, sp.y);
+      ctx.lineTo(ax2, sp.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      this._drawArrowhead(ctx, ax2, sp.y, 0, isDark ? '#6B8CAE' : '#4A6880', isDark ? '#6B8CAE' : '#4A6880', 10);
+      ctx.restore();
+    }
+
+    // ── Draw Nodes ──
+    stateOrder.forEach((state) => {
+      const pos    = nodePositions.get(state);
+      const isActive = this.initialized && this.tm.currentState === state;
+      const isAccept = isAcceptState(state);
+      const isStart  = isStartState(state);
+
+      ctx.save();
+
+      let fillColor = NODE_NORMAL;
+      if (isAccept) fillColor = NODE_ACCEPT;
+      else if (isStart) fillColor = NODE_START;
+
+      // Active glow ring
+      if (isActive) {
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, nodeRadius + 7, 0, Math.PI * 2);
+        ctx.fillStyle = NODE_ACTIVE_RING;
+        ctx.shadowColor = NODE_ACTIVE_RING;
+        ctx.shadowBlur = 22;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      } else {
+        ctx.shadowColor = fillColor;
+        ctx.shadowBlur = 10;
+      }
+
+      // Main circle
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, nodeRadius, 0, Math.PI * 2);
+      ctx.fillStyle = fillColor;
+      ctx.fill();
+
+      // Border: white stroke
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Accept state: double ring (turingmachine.io style)
+      if (isAccept) {
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, nodeRadius - 5, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+      }
+
+      // State label — green text for accept, red for reject, white otherwise
+      const lbl = String(state);
+      const isReject = String(state).toLowerCase().includes('reject');
+      const fontSize = lbl.length > 5 ? 10 : lbl.length > 3 ? 12 : 14;
+      if (isAccept) ctx.fillStyle = '#00FF88';       // bright green for accept
+      else if (isReject) ctx.fillStyle = '#FF4444';  // bright red for reject
+      else ctx.fillStyle = WHITE;
+      ctx.font = `bold ${fontSize}px "JetBrains Mono", monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(lbl, pos.x, pos.y + 1);
+
+      ctx.restore();
+    });
+
+    if (!this._diagramThemeListenerAdded) {
+      const themeToggle = document.getElementById("theme-toggle");
+      if (themeToggle) {
+        themeToggle.addEventListener('click', () => { setTimeout(() => this.renderDiagram(), 50); });
+        this._diagramThemeListenerAdded = true;
+      }
+      window.addEventListener('resize', () => this.renderDiagram());
+    }
+  }
+
+  // Draw edge labels with BLUE HIGHLIGHTER background (turingmachine.io style)
+  _drawEdgeLabels(ctx, labels, cx, cy, textColor, bgColorFn, isActive) {
+    ctx.shadowBlur = 0;
+
+    const fontSize = 12;
+    const FONT      = `${fontSize}px "JetBrains Mono", monospace`;
+    const FONT_BOLD = `bold ${fontSize}px "JetBrains Mono", monospace`;
+    ctx.font = FONT_BOLD; // always bold for readability
+
+    const lineH = 18;
+    const padX  = 9, padY = 5;
+
+    // Measure widest label
+    let maxW = 0;
+    labels.forEach(lbl => {
+      const m = ctx.measureText(lbl);
+      if (m.width > maxW) maxW = m.width;
+    });
+
+    const boxW = maxW + padX * 2;
+    const boxH = labels.length * lineH + padY * 2;
+    const bx   = cx - boxW / 2;
+    const by   = cy - boxH / 2;
+
+    // ── Blue highlighter background ──
+    const bgFill   = isActive ? 'rgba(231,76,60,0.22)' : 'rgba(37,99,235,0.20)';  // blue tint
+    const bgStroke = isActive ? 'rgba(231,76,60,0.85)' : 'rgba(37,99,235,0.85)';  // blue border
+
+    ctx.save();
+    ctx.fillStyle   = bgFill;
+    ctx.strokeStyle = bgStroke;
+    ctx.lineWidth   = 1.5;
+
+    // Rounded rect
+    const r = 5;
+    ctx.beginPath();
+    ctx.moveTo(bx + r, by);
+    ctx.lineTo(bx + boxW - r, by);
+    ctx.quadraticCurveTo(bx + boxW, by,       bx + boxW, by + r);
+    ctx.lineTo(bx + boxW, by + boxH - r);
+    ctx.quadraticCurveTo(bx + boxW, by + boxH, bx + boxW - r, by + boxH);
+    ctx.lineTo(bx + r,    by + boxH);
+    ctx.quadraticCurveTo(bx,        by + boxH, bx,        by + boxH - r);
+    ctx.lineTo(bx,        by + r);
+    ctx.quadraticCurveTo(bx,        by,        bx + r,    by);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // ── Label text ──
+    ctx.save();
+    ctx.font          = FONT_BOLD;
+    ctx.fillStyle     = isActive ? '#cc2200' : '#1d4ed8';  // deep blue text / dark red when active
+    ctx.textAlign     = 'center';
+    ctx.textBaseline  = 'middle';
+    labels.forEach((lbl, i) => {
+      ctx.fillText(lbl, cx, by + padY + lineH * i + lineH / 2);
+    });
+    ctx.restore();
+  }
+
+  _drawArrowhead(ctx, x, y, angle, color, glowColor, size) {
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.shadowColor = glowColor || color;
+    ctx.shadowBlur = 8;
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-size, -size * 0.42);
+    ctx.lineTo(-size * 0.7, 0);
+    ctx.lineTo(-size, size * 0.42);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  triggerDiagramAnimation() {
+     this.renderDiagram();
+  }
+
+
+
+
+}
+
+// ── Bootstrap ────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  const ui = new TuringMachineUI();
+  if (ui.els.presetSelect.value) {
+     ui.loadPreset(ui.els.presetSelect.value);
+  } else {
+     ui.initializeMachine();
+  }
+});
+
+</script>
+</body>
+</html>
